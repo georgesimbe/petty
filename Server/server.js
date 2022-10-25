@@ -22,9 +22,26 @@ let saFuelApi = axios.create({
   }
 })
 
-app.get("/", function(req,res){
+app.get("/getCountryFuelTypes", function(req,res){
   saFuelApi(`GetCountryFuelTypes?countryId=21`).then(({data}) => {
     res.send(JSON.stringify(data))
   })
+})
 
+app.get("/getCountryGeographicRegions", function(req,res){
+  saFuelApi(`/GetCountryGeographicRegions?countryId=21`).then(({data}) => {
+    res.send(JSON.stringify(data))
+  })
+})
+
+app.get("/getCountryBrands", function(req,res){
+  saFuelApi(`/GetCountryBrands?countryId=21`).then(({data}) => {
+    res.send(JSON.stringify(data))
+  })
+})
+
+app.get("/getFullSiteDetails", function(req,res){
+  saFuelApi(`/GetFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=4`).then(({data}) => {
+    res.send(JSON.stringify(data))
+  })
 })
