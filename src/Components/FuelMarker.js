@@ -13,18 +13,9 @@ import axios from 'axios';
 //   )
 // };
 
-function FuelMarker (){
-  const [fuelBrands,setFuelBrands] = useState([])
-  useEffect(() => {
-    let url = "http://localhost:3004/"
-    axios.get(url + `GetFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=4`)
-    .then(response => setFuelBrands(response.data))
-    .catch(err => {
-      console.log(err);
-    });
-  }, [])
-  return fuelBrands.S
-}
+// function FuelMarker (){
+  
+// }
 
 // function apiCaller (){
 
