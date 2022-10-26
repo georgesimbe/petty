@@ -3,11 +3,12 @@ import React, { useEffect, useState, useRef } from 'react';
 import ReactMapGL, { Marker, GeolocateControl, NavigationControl } from 'react-map-gl'
 import mapboxgl from '!mapbox-gl'; // eslint-disable-line 
 import useSwr from 'swr'
+import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
 // import FuelMarker from './Components/FuelMarker'
 // import FuelMarker from './Components/FuelMarker'; 
 // import { useAsync } from 'react-async';
 import axios from 'axios';
-
+import useSupercluster from "use-supercluster";
 
 const fetcher = (...args) => fetch(...args).then(response => response.json())
 // function LoadFuelPlaces() {
@@ -30,6 +31,27 @@ export default function App() {
   let url = "http://localhost:3004/getFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=4"
   const { data, error } = useSwr(url, fetcher)
   const fuelMark = data && !error ? data : []
+  const points = fuelMark.S.map(fuelLocation => ({
+    type: "Feature",
+    properties: { cluster: false, fuelId: fuelLocation.id, category: fuelLocation.category },
+    geometry: {
+      type: "Point",
+      coordinates: [
+        parseFloat(fuelLocation.location.longitude),
+        parseFloat(fuelLocation.location.latitude)
+      ]
+    }
+  }))
+
+  const bounds = mapRef.current ? mapRef.current.getMap().getBounds().toArray().flat() : null
+
+  const { clusters, supercluster } = useSupercluster({
+    points,
+    zoom: viewPort.zoom,
+    bound: [],
+    option: { radius: 75, maxZoom: 20 }
+  });
+
 
   // console.log([fuelMark])
   // const
@@ -105,6 +127,7 @@ export default function App() {
   // }
   // if (error) return `Something went wrong: ${error.message}`
   // if (data) {
+  console.log(clusters)
   return (
     <ReactMapGL
       mapboxAccessToken={process.env.REACT_APP_TOKEN}
@@ -115,19 +138,65 @@ export default function App() {
       }}
       mapStyle='mapbox://styles/mapbox/streets-v11'
       style={{ width: "100vw", height: "100vh" }}
+      ref={mapRef}
     >
-      {/* <GeolocateControl ref={geolocateControlRef}  position='bottom-right'/> */}
-      {/* <NavigationControl position='bottom-left' /> */}
 
-      {fuelMark.S.map(fm => (
-        <Marker key={fm.S} latitude={fm.Lat} longitude={fm.lng}>
-          <button className='fuel-marker'>
-            <img src="/fuelIcon.svg" alt="" />
-          </button>
-        </Marker>
-      )
-      )}
+      {clusters.map(cluster => {
+        const [longitude, latitude] = cluster.geometry.coordinates;
+        const {
+          cluster: isCluster,
+          point_count: pointCount
+        } = cluster.properties;
+
+        if (isCluster) {
+          return (
+            <Marker
+              key={`cluster-${cluster.id}`}
+              latitude={latitude}
+              longitude={longitude}
+            >
+              <div
+                className="cluster-marker"
+                style={{
+                  width: `${10 + (pointCount / points.length) * 20}px`,
+                  height: `${10 + (pointCount / points.length) * 20}px`
+                }}
+                onClick={() => {
+                  const expansionZoom = Math.min(
+                    supercluster.getClusterExpansionZoom(cluster.id),
+                    20
+                  );
+
+                  setViewPort({
+                    ...viewPort,
+                    latitude,
+                    longitude,
+                    zoom: expansionZoom,
+                    transitionInterpolator: new MapboxGeocoder({
+                      speed: 2
+                    }),
+                    transitionDuration: "auto"
+                  });
+                }}
+              >
+                {pointCount}
+              </div>
+            </Marker>
+          );
+        }
+
+        return (
+          <Marker
+            key={`crime-${cluster.properties.fuelId}`}
+            latitude={latitude}
+            longitude={longitude}
+          >
+            <button className="fuel-marker">
+              <img src="/fuelLcon" />
+            </button>
+          </Marker>
+        )
+      })}
     </ReactMapGL>
   )
 }
-// }
