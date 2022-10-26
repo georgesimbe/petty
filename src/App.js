@@ -1,24 +1,15 @@
 import './App.css';
-import React, { useEffect, useState, useRef } from 'react';
-import ReactMapGL, { Marker, GeolocateControl, NavigationControl } from 'react-map-gl'
+import React, { useMemo, useState, useRef, useEffect } from 'react';
+import ReactMapGL, {
+  Marker, GeolocateControl, ScaleControl, Popup
+} from 'react-map-gl'
 import mapboxgl from '!mapbox-gl'; // eslint-disable-line 
-import useSwr from 'swr'
-import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
-// import FuelMarker from './Components/FuelMarker'
-// import FuelMarker from './Components/FuelMarker'; 
-// import { useAsync } from 'react-async';
 import axios from 'axios';
-import useSupercluster from "use-supercluster";
+import Pin from './pin';
 
-const fetcher = (...args) => fetch(...args).then(response => response.json())
-// function LoadFuelPlaces() {
-
-//   // .then(res => (res.ok ? res : Promise.reject(res)))
-//   // .then(res => res.json())
-// }
-// console.log(LoadFuelPlaces())
 export default function App() {
   mapboxgl.accessToken = process.env.REACT_APP_TOKEN
+  const mapRef = useRef(null)
   const [viewPort, setViewPort] = useState({
     longitude: 138.63,
     latitude: -34.8626,
@@ -27,30 +18,66 @@ export default function App() {
     zoom: 10.45
   })
 
-  const mapRef = useRef()
-  let url = "http://localhost:3004/getFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=4"
-  const { data, error } = useSwr(url, fetcher)
-  const fuelMark = data && !error ? data : []
-  const points = fuelMark.S.map(fuelLocation => ({
-    type: "Feature",
-    properties: { cluster: false, fuelId: fuelLocation.id, category: fuelLocation.category },
-    geometry: {
-      type: "Point",
-      coordinates: [
-        parseFloat(fuelLocation.location.longitude),
-        parseFloat(fuelLocation.location.latitude)
-      ]
-    }
-  }))
 
-  const bounds = mapRef.current ? mapRef.current.getMap().getBounds().toArray().flat() : null
+  const [fuelMark, setFuelMark] = useState([])
+  useEffect(() => {
+    axios.get("http://localhost:3004/getFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=4")
+      .then((data) => {
+        setFuelMark(data.data)
+      })
+      .catch((err) => {
+        console.log("err " + err);
+      });
+  }, []);
 
-  const { clusters, supercluster } = useSupercluster({
-    points,
-    zoom: viewPort.zoom,
-    bound: [],
-    option: { radius: 75, maxZoom: 20 }
-  });
+  const [popupInfo, setPopupInfo] = useState(null);
+  console.log(fuelMark.S)
+  const pins = useMemo(
+    () =>
+      fuelMark.S && Object.keys(fuelMark.S).map((fuel, index) => {
+        // console.log(fuelMark.S[index])
+        return (
+          < Marker
+            key={`marker-${fuel}`}
+            longitude={fuelMark.S[index].Lng}
+            latitude={fuelMark.S[index].Lat}
+            anchor="bottom"
+            onClick={e => {
+              e.originalEvent.stopPropagation();
+              setPopupInfo(fuelMark.S[index]);
+            }}
+          >
+            <Pin />
+          </Marker >
+        )
+      }
+      ), [fuelMark])
+
+
+
+
+  // const points = fuelMark.map(fuelLocation => ({
+  //   type: "s",
+  //   properties: { cluster: false, fuelId: fuelLocation.id, category: fuelLocation.category },
+  //   geometry: {
+  //     type: "Point",
+  //     coordinates: [
+  //       parseFloat(fuelLocation.location.longitude),
+  //       parseFloat(fuelLocation.location.latitude)
+  //     ]
+  //   }
+  // }))
+
+  // const bounds = mapRef.current ? mapRef.current.getMap().getBounds().toArray().flat() : null
+
+
+  // const { clusters, supercluster } = useSupercluster({
+  //   points,
+  //   bounds,
+  //   zoom: viewPort.zoom,
+  //   bound: [],
+  //   option: { radius: 75, maxZoom: 20 }
+  // });
 
 
   // console.log([fuelMark])
@@ -126,77 +153,101 @@ export default function App() {
   //   )
   // }
   // if (error) return `Something went wrong: ${error.message}`
-  // if (data) {
-  console.log(clusters)
+  // // if (data) {
+  // console.log(clusters)
   return (
-    <ReactMapGL
-      mapboxAccessToken={process.env.REACT_APP_TOKEN}
-      {...viewPort}
-      maxZoom={20}
-      onMove={viewPort => {
-        setViewPort(viewPort.viewPort)
-      }}
-      mapStyle='mapbox://styles/mapbox/streets-v11'
-      style={{ width: "100vw", height: "100vh" }}
-      ref={mapRef}
-    >
+    <>
+      <ReactMapGL
+        mapboxAccessToken={process.env.REACT_APP_TOKEN}
+        {...viewPort}
+        maxZoom={20}
+        onMove={viewPort => {
+          setViewPort(viewPort.viewPort)
+        }}
+        bearing={0}
+        pitch={0}
+        mapStyle='mapbox://styles/mapbox/streets-v11'
+        style={{ width: "100vw", height: "100vh" }
+        }
+        ref={mapRef}
+      >
+        <ScaleControl />
+        {pins}
 
-      {clusters.map(cluster => {
-        const [longitude, latitude] = cluster.geometry.coordinates;
-        const {
-          cluster: isCluster,
-          point_count: pointCount
-        } = cluster.properties;
+        {/* {
+        clusters.map(cluster => {
+          const [longitude, latitude] = cluster.geometry.coordinates;
+          const {
+            cluster: isCluster,
+            point_count: pointCount
+          } = cluster.properties;
 
-        if (isCluster) {
+          if (isCluster) {
+            return (
+              <Marker
+                key={`cluster-${cluster.id}`}
+                latitude={latitude}
+                longitude={longitude}
+              >
+                <div
+                  className="cluster-marker"
+                  style={{
+                    width: `${10 + (pointCount / points.length) * 20}px`,
+                    height: `${10 + (pointCount / points.length) * 20}px`
+                  }}
+                  onClick={() => {
+                    const expansionZoom = Math.min(
+                      supercluster.getClusterExpansionZoom(cluster.id),
+                      20
+                    );
+
+                    setViewPort({
+                      ...viewPort,
+                      latitude,
+                      longitude,
+                      zoom: expansionZoom,
+                      transitionInterpolator: new MapboxGeocoder({
+                        speed: 2
+                      }),
+                      transitionDuration: "auto"
+                    });
+                  }}
+                >
+                  {pointCount}
+                </div>
+              </Marker>
+            );
+          }
+
           return (
             <Marker
-              key={`cluster-${cluster.id}`}
+              key={`crime-${cluster.properties.fuelId}`}
               latitude={latitude}
               longitude={longitude}
             >
-              <div
-                className="cluster-marker"
-                style={{
-                  width: `${10 + (pointCount / points.length) * 20}px`,
-                  height: `${10 + (pointCount / points.length) * 20}px`
-                }}
-                onClick={() => {
-                  const expansionZoom = Math.min(
-                    supercluster.getClusterExpansionZoom(cluster.id),
-                    20
-                  );
-
-                  setViewPort({
-                    ...viewPort,
-                    latitude,
-                    longitude,
-                    zoom: expansionZoom,
-                    transitionInterpolator: new MapboxGeocoder({
-                      speed: 2
-                    }),
-                    transitionDuration: "auto"
-                  });
-                }}
-              >
-                {pointCount}
-              </div>
+              <button className="fuel-marker">
+                <img src="/fuelLcon" />
+              </button>
             </Marker>
-          );
-        }
+          )
+        })
+      } */}
 
-        return (
-          <Marker
-            key={`crime-${cluster.properties.fuelId}`}
-            latitude={latitude}
-            longitude={longitude}
+        {popupInfo && (
+          <Popup
+            anchor="top"
+            longitude={Number(popupInfo.Lng)}
+            latitude={Number(popupInfo.Lat)}
+            onClose={() => setPopupInfo(null)}
           >
-            <button className="fuel-marker">
-              <img src="/fuelLcon" />
-            </button>
-          </Marker>
-        )
-      })}
-    </ReactMapGL>
+            <div>
+              {popupInfo.N}, {popupInfo.P} |{' '}
+            </div>
+            <img width="100%" src={popupInfo.image} />
+          </Popup>
+        )}
+      </ReactMapGL >
+      {/* <ControlPanel /> */}
+    </>
   )
 }
