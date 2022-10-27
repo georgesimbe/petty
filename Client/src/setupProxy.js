@@ -1,5 +1,5 @@
-const proxy = require("http-proxy-middleware");
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
-module.exports = app => {
-  app.use(proxy("/api/*", { target: "http://localhost:3004/" }));
+module.exports = function (app) {
+  app.use(createProxyMiddleware('/proxypath', { target: 'http://localhost:3004/' }));
 };
