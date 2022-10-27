@@ -22,7 +22,7 @@ export default function App() {
   })
   const [fuelPrices, setFuelPrices] = useState([])
   useEffect(() => {
-    axios.get("http://localhost:3004/Price/GetSitesPrices?countryId=21&geoRegionLevel=3&geoRegionId=4")
+    axios.get("/api/Price/GetSitesPrices?countryId=21&geoRegionLevel=3&geoRegionId=4")
       .then((data) => {
         setFuelPrices(data.data)
       })
